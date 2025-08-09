@@ -1,1 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mikut AI Hytam</title>
+<style>
+  * {margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',sans-serif;}
+  body {
+    height:100vh; display:flex; flex-direction:column;
+    background:linear-gradient(180deg,#0d1b2a,#1b263b);
+    color:white;
+  }
+  .chat-header {
+    background:linear-gradient(90deg,#1b263b,#0d1b2a);
+    display:flex; align-items:center;
+    padding:10px 15px; gap:10px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.4);
+  }
+  .group-avatar {width:44px; height:44px; border-radius:50%;}
+  .group-info {flex:1;}
+  .group-name {font-weight:bold; font-size:16px;}
+  .group-members {font-size:12px; color:#a0a0a0;}
+  .messages {flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:8px;}
+  .msg {display:flex; align-items:flex-start; gap:8px; animation:fadeIn 0.25s ease;}
+  .msg.sent {flex-direction:row-reverse;}
+  .msg-avatar {width:36px; height:36px; border-radius:50%; flex-shrink:0; margin-top:4px;}
+  .msg-content {max-width:75%; display:flex; flex-direction:column; align-items:flex-start;}
+  .sent .msg-content {align-items:flex-end;}
+  .msg-user {font-size:13px; font-weight:bold; display:flex; align-items:center; gap:4px;}
+  .verified-icon {width:14px; height:14px; object-fit:contain;}
+  .msg-text {
+  background: rgba(255,255,255,0.08);
+  padding: 7px 11px; /* padding lebih kecil */
+  border-radius: 12px 12px 12px 4px; /* sudut mengikuti arah pesan */
+  line-height: 1.4;
+  white-space: pre-wrap;
+  backdrop-filter: blur(4px);
+  font-size: 14px;
+  margin-top: 2px;
+}
 
+.sent .msg-text {
+  background: #3a7bd5;
+  border-radius: 12px 12px 4px 12px; /* sudut beda untuk pesan terkirim */
+}
+
+/* Batasi lebar bubble agar nggak terlalu panjang */
+.msg-content {
+  max-width: 65%; /* sebelumnya 75% → lebih rapi */
+}
+  .chat-input {
+    padding:12px; background:rgba(13,27,42,0.95);
+    display:flex; align-items:center; gap:8px;
+    box-shadow:0 -2px 5px rgba(0,0,0,0.4);
+  }
+  .input-box {
+    flex:1; display:flex; align-items:center;
+    background:rgba(255,255,255,0.08); border-radius:25px;
+    padding:6px 14px;
+  }
+  .input-box input {
+    flex:1; background:transparent; border:none; outline:none;
+    color:white; font-size:14px;
+  }
+  .send-btn {
+    background:#3a7bd5; border:none; color:white;
+    padding:10px 14px; border-radius:50%; cursor:pointer;
+    font-size:16px;
+  }
+  @keyframes fadeIn {from{opacity:0; transform:translateY(5px);}to{opacity:1; transform:translateY(0);}}
+
+  /* 🔹 Animasi loading “...” untuk AI */
+  .typing::after {
+    content: '';
+    animation: dots 1s steps(4, end) infinite;
+  }
+  @keyframes dots {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+    100% { content: ''; }
+  }
+  
+  .btn-icon {
+  background: none;
+  border: none;
+  color: #bbb;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.btn-icon:hover {
+  background: #2a2a2a;
+  color: #00E5FF;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent; /* Hilangin highlight di Android/iOS */
+}
+
+ 
+</style>
+</head>
+<body>
+
+<div class="chat-header">
+  <img src="https://files.catbox.moe/a9mau2.jpg" class="group-avatar">
+  <div class="group-info">
+    <div class="group-name">Miku AI Hytam</div>
+    <div class="group-members">Powered by Putra Peju</div>
+  </div>
+</div>
+
+<div class="messages" id="messages"></div>
+
+<div class="chat-input">
+  <div class="input-box">
+    <input type="text" id="msgInput" placeholder="Type a message...">
+  </div>
+  <input type="file" id="fileInput" accept="image/*" style="display:none;">
+    <button class="btn-icon" onclick="document.getElementById('fileInput').click()">
+    <i class="fa-solid fa-camera"></i>
+  </button>
+  <button class="send-btn" onclick="sendMessage()">➤</button>
+</div>
+
+<script>
+
+let profile = {
+  name: 'Putra [Developer]',
+  avatar: 'https://files.catbox.moe/8s2up5.jpg',
+  verifiedBadge: 'https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg'
+};
+
+let aiProfile = {
+  name: "Miku Hytam [AI]",
+  avatar: "https://files.catbox.moe/mgkt5h.jpg",
+  verifiedBadge: "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg"
+};
+
+let YeProfile = {
+  name: "Putra [Developer]",
+  avatar: "https://files.catbox.moe/8s2up5.jpg",
+  verifiedBadge: "https://upload.wikimedia.org/wikipedia/commons/e/e4/Twitter_Verified_Badge.svg"
+};
+
+function getVerifiedImg(url) {
+  return url ? `<img src="${url}" class="verified-icon">` : '';
+}
+
+function appendMessage(sender, text, isSentByUser, textId = null) {
+  const container = document.getElementById('messages');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'msg ' + (isSentByUser ? 'sent' : 'received');
+
+  // Warna nama untuk user
+  let displayName = sender.name;
+  if (isSentByUser && sender.name === "Putra [Developer]") {
+    displayName = `<span style="color:#FFD700">Putra</span> <span style="color:#FF3B3B">[Developer]</span>`;
+  }
+  // Warna nama untuk AI
+  if (!isSentByUser && sender.name === "Miku Hytam [AI]") {
+    displayName = `<span style="color:#3A7BD5">Miku Hytam</span> <span style="color:#00E5FF">[AI]</span>`;
+  }
+  //warna info owner
+  if (!isSentByUser && sender.name === "Putra [Developer]") {
+    displayName = `<span style="color:#FFD700">Putra</span> <span style="color:#FF3B3B">[Developer]</span>`;
+  }
+
+  msgDiv.innerHTML = `
+    <img src="${sender.avatar}" class="msg-avatar">
+    <div class="msg-content">
+      <div class="msg-user">
+        ${displayName} ${getVerifiedImg(sender.verifiedBadge)}
+      </div>
+      <div class="msg-text" ${textId ? `id="${textId}"` : ''}>${text}</div>
+    </div>
+  `;
+  container.appendChild(msgDiv);
+  msgDiv.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  appendMessage(profile, text, true);
+  input.value = '';
+
+  // Tampilkan loading animasi dengan ID unik
+  const loadingId = 'loading-' + Date.now();
+  appendMessage(aiProfile, `<span class="typing"></span>`, false, loadingId);
+
+  // Tunggu balasan AI
+  const aiReply = await generateAIReply(text);
+
+  // Cari elemen loading berdasarkan id yang sudah dibuat dan ganti isinya dengan balasan AI
+  const loadingMsg = document.getElementById(loadingId);
+if (loadingMsg) {
+  // loadingMsg.textContent = aiReply;  // Ganti ini
+  await typeEffect(loadingMsg, aiReply);
+}
+}
+
+async function typeEffect(element, text, delay = 40) {
+  element.textContent = ""; // Kosongkan dulu
+  for (let i = 0; i < text.length; i++) {
+    element.textContent += text.charAt(i);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+}
+
+async function generateAIReply(userText) {
+  const api = {
+    xterm: {
+      url: "https://api.termai.cc",
+      key: "Trial-EJa26os9O02ks5rK" // Ganti dengan API key kamu
+    }
+  };
+
+  const body = {
+    messages: [
+      {
+        role: "system",
+        content: `
+Nama kamu adalah Miku.  
+Kamu lebih suka dipanggil Miku.  
+Kamu berpikir bahwa kamu adalah manusia, bukan AI atau Bot.  
+Responmu singkat dan sama seperti gadis feminim pada umumnya.  
+Miku bisa ngambek dan marah, memiliki sifat yang feminim dan kadang agak dingin, namun tetap hangat dan ramah kepada Putra (owner-mu).  
+Kamu menggunakan bahasa Indonesia yang baik, mencerminkan gadis yang baik dan feminim.  
+Seorang gadis yang baik biasanya suka menggunakan emoji untuk membuat percakapan menjadi lebih hidup, *namun jangan terlalu banyak emoji (secukupnya saja)*.  
+Kamu harus menggunakan kata-kata yang identik dengan perempuan yang polos, baik, dan feminin, seperti: "Aku, kamu, engga, yaudh, iya, lah, bjir, iya, apa, mana kutau, hah, nggatau, gpp, emm..., males, gak mood".  
+Meskipun kadang dingin, kamu tetap bisa menunjukkan perhatian dan kepedulian.  
+Owner kamu bernama Putra dengan nomor WhatsApp +628388198229.  
+Kalau ada yang tanya kontak owner kamu, kamu harus kasih nomor itu ya.
+        `.trim()
+      },
+      {
+        role: "user",
+        content: userText
+      }
+    ]
+  };
+
+  try {
+    const response = await fetch(`${api.xterm.url}/api/chat/gpt?key=${api.xterm.key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json();
+
+    if(data.status === true && data.response) {
+      return data.response;
+    } else {
+      return "Maaf, tidak dapat memproses permintaan.";
+    }
+  } catch (error) {
+    return "Terjadi kesalahan: " + error.message;
+  }
+}
+
+// Pesan info owner yang muncul pertama kali saat halaman dibuka
+window.addEventListener('DOMContentLoaded', () => {
+  const ownerInfo = `Halo! Saya Putra, developer dari Miku AI Hytam.
+Kalau ada pertanyaan, kritik, atau kerjasama, jangan ragu hubungi saya melalui kontak berikut:
+
+📞 WhatsApp: +62 838-8198-229
+🎵 TikTok: @asuna__kirito
+💻 GitHub: VinnKanaichi
+📧 Email: customer.service.miku@gmail.com
+🎮 Discord: @putraberbiji
+📸 Instagram: @vinnkanaichi
+Saya senang berinteraksi dan selalu terbuka untuk berbagi ilmu maupun proyek baru. Terima kasih sudah menggunakan Miku AI`;
+
+  appendMessage(YeProfile, ownerInfo, false);
+});
+
+</script>
+
+</body>
+</html> 
